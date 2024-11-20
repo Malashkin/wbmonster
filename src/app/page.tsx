@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { saveAs } from "file-saver";
 
-// Extend the Window interface to include showSaveFilePicker
+// Расширение интерфейса Window для поддержки showSaveFilePicker
 declare global {
   interface Window {
     showSaveFilePicker?: (
@@ -76,17 +76,25 @@ export default function WildberriesFeedbackFetcher() {
       const nmId = String(review.productDetails.nmId);
       uniqueNmIds.add(nmId);
       const text = review.text || "";
+      const author = review.userName || "Unknown";
+      const verified = review.wasViewed || false;
+      const date = review.createdDate
+        ? new Date(review.createdDate).toISOString()
+        : "";
+      const rating = review.productValuation || 0;
+
       if (text) {
         totalNonEmptyTexts++;
         nmIdTextCounts[nmId] = (nmIdTextCounts[nmId] || 0) + 1;
       }
+
       return {
         nmId,
         text,
-        author: review.userName || "Unknown",
-        verified: review.wasViewed || false,
-        date: review.createdDate || "",
-        rating: review.productValuation || 0,
+        author,
+        verified,
+        date,
+        rating,
       };
     });
 
@@ -103,7 +111,7 @@ export default function WildberriesFeedbackFetcher() {
     const baseParams: FeedbackParams = {
       isAnswered: "true",
       take: 10000,
-      skip: 200000,
+      skip: 0, // Начинаем с 0 для корректной пагинации
       order: "dateDesc",
       dateFrom: Math.floor(startDate.getTime() / 1000),
       dateTo: Math.floor(now.getTime() / 1000),
@@ -113,7 +121,9 @@ export default function WildberriesFeedbackFetcher() {
     let uniqueNmIdsSet = new Set<string>();
     let totalNonEmptyTexts = 0;
     let nmIdTextCounts: { [key: string]: number } = {};
-    let csvContent = "NmId,Text,Author,Verified,Date,Rating\n";
+
+    // Обновлённый заголовок CSV с нужными полями
+    let csvContent = "PRODUCT ID,BODY,AUTHOR,Verified,CREATED AT,RATING\n";
 
     try {
       const nmids = nmidList ? nmidList.split(",").map((id) => id.trim()) : [];
@@ -152,13 +162,13 @@ export default function WildberriesFeedbackFetcher() {
                 (nmIdTextCounts[key] || 0) + textCounts[key];
             });
 
+            // Обновлённые строки данных CSV с запятыми
             processedData.forEach((review) => {
-              csvContent += `${review.nmId},"${review.text.replace(
-                /"/g,
-                '""'
-              )}",${review.author},${review.verified},${review.date},${
-                review.rating
-              }\n`;
+              const verifiedStr = review.verified ? "TRUE" : "FALSE";
+              const formattedDate = review.date;
+              const escapedText = review.text.replace(/"/g, '""');
+              const escapedAuthor = review.author.replace(/"/g, '""');
+              csvContent += `"${review.nmId}","${escapedText}","${escapedAuthor}",${verifiedStr},"${formattedDate}",${review.rating}\n`;
             });
 
             skip += reviews.length;
@@ -203,13 +213,13 @@ export default function WildberriesFeedbackFetcher() {
             nmIdTextCounts[key] = (nmIdTextCounts[key] || 0) + textCounts[key];
           });
 
+          // Обновлённые строки данных CSV с запятыми
           processedData.forEach((review) => {
-            csvContent += `${review.nmId},"${review.text.replace(
-              /"/g,
-              '""'
-            )}",${review.author},${review.verified},${review.date},${
-              review.rating
-            }\n`;
+            const verifiedStr = review.verified ? "TRUE" : "FALSE";
+            const formattedDate = review.date;
+            const escapedText = review.text.replace(/"/g, '""');
+            const escapedAuthor = review.author.replace(/"/g, '""');
+            csvContent += `"${review.nmId}","${escapedText}","${escapedAuthor}",${verifiedStr},"${formattedDate}",${review.rating}\n`;
           });
 
           skip += reviews.length;
@@ -246,7 +256,7 @@ export default function WildberriesFeedbackFetcher() {
 
   const handleSaveFile = async () => {
     if (!csvData) {
-      console.error("No data to save");
+      console.error("Нет данных для сохранения");
       return;
     }
 
@@ -269,13 +279,15 @@ export default function WildberriesFeedbackFetcher() {
         const writable = await handle.createWritable();
         await writable.write(blob);
         await writable.close();
-        console.log("File saved successfully");
+        console.log("Файл успешно сохранен");
       } catch (err) {
-        console.log("User cancelled or error occurred, falling back to saveAs");
+        console.log(
+          "Пользователь отменил действие или произошла ошибка, используем saveAs"
+        );
         saveAs(blob, fileName);
       }
     } else {
-      // Fallback for browsers that don't support the File System Access API
+      // Альтернативный вариант для браузеров, не поддерживающих File System Access API
       saveAs(blob, fileName);
     }
   };
@@ -299,7 +311,7 @@ export default function WildberriesFeedbackFetcher() {
               type="text"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Enter your API key"
+              placeholder="Введите ваш API ключ"
             />
           </div>
           <div>
@@ -307,14 +319,14 @@ export default function WildberriesFeedbackFetcher() {
               htmlFor="daysCount"
               className="block text-sm font-medium text-gray-700"
             >
-              Number of Days
+              Количество дней
             </label>
             <Input
               id="daysCount"
               type="number"
               value={daysCount}
               onChange={(e) => setDaysCount(Number(e.target.value))}
-              placeholder="Enter number of days"
+              placeholder="Введите количество дней"
             />
           </div>
           <div>
@@ -322,14 +334,14 @@ export default function WildberriesFeedbackFetcher() {
               htmlFor="nmidList"
               className="block text-sm font-medium text-gray-700"
             >
-              NMID List (comma-separated, optional)
+              Список NMID (через запятую, опционально)
             </label>
             <div className="flex gap-2">
               <Textarea
                 id="nmidList"
                 value={nmidList}
                 onChange={(e) => setNmidList(e.target.value)}
-                placeholder="Enter NMID list (optional)"
+                placeholder="Введите список NMID (опционально)"
               />
               <Button
                 variant="outline"
@@ -342,20 +354,22 @@ export default function WildberriesFeedbackFetcher() {
                   setNmidList(processed);
                 }}
               >
-                Format IDs
+                Форматировать ID
               </Button>
             </div>
           </div>
           <div className="flex space-x-2">
             <Button onClick={handleFetch} disabled={isLoading}>
-              {isLoading ? "Fetching..." : "Fetch Feedback"}
+              {isLoading ? "Загрузка..." : "Получить отзывы"}
             </Button>
             {csvData && (
-              <Button onClick={handleSaveFile}>Save Results to CSV</Button>
+              <Button onClick={handleSaveFile}>
+                Сохранить результаты в CSV
+              </Button>
             )}
           </div>
           <div>
-            <h3 className="text-lg font-medium">Results:</h3>
+            <h3 className="text-lg font-medium">Результаты:</h3>
             <pre className="mt-2 p-4 bg-gray-100 rounded-md overflow-auto max-h-96">
               {results.join("\n")}
             </pre>
