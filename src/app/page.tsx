@@ -319,7 +319,7 @@ export default function WildberriesFeedbackFetcher() {
               htmlFor="daysCount"
               className="block text-sm font-medium text-gray-700"
             >
-              Количество дней
+              Days
             </label>
             <Input
               id="daysCount"
@@ -334,7 +334,7 @@ export default function WildberriesFeedbackFetcher() {
               htmlFor="nmidList"
               className="block text-sm font-medium text-gray-700"
             >
-              Список NMID (через запятую, опционально)
+              List NMID (optional)
             </label>
             <div className="flex gap-2">
               <Textarea
@@ -354,18 +354,16 @@ export default function WildberriesFeedbackFetcher() {
                   setNmidList(processed);
                 }}
               >
-                Форматировать ID
+                Format IDs
               </Button>
             </div>
           </div>
           <div className="flex space-x-2">
             <Button onClick={handleFetch} disabled={isLoading}>
-              {isLoading ? "Загрузка..." : "Получить отзывы"}
+              {isLoading ? "Loading..." : "Fetch reviews"}
             </Button>
             {csvData && (
-              <Button onClick={handleSaveFile}>
-                Сохранить результаты в CSV
-              </Button>
+              <Button onClick={handleSaveFile}>Save Results to CSV</Button>
             )}
           </div>
           <div>
