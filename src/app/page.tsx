@@ -7,6 +7,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { saveAs } from "file-saver";
 
+// Extend the Window interface to include showSaveFilePicker
+declare global {
+  interface Window {
+    showSaveFilePicker?: (
+      options?: SaveFilePickerOptions
+    ) => Promise<FileSystemFileHandle>;
+  }
+
+  interface SaveFilePickerOptions {
+    suggestedName?: string;
+    types?: Array<{
+      description: string;
+      accept: { [mimeType: string]: string[] };
+    }>;
+  }
+}
+
 interface FeedbackParams {
   isAnswered: string;
   take: number;
@@ -238,7 +255,7 @@ export default function WildberriesFeedbackFetcher() {
       .toISOString()
       .slice(0, 10)}.csv`;
 
-    if ("showSaveFilePicker" in window) {
+    if (window.showSaveFilePicker) {
       try {
         const handle = await window.showSaveFilePicker({
           suggestedName: fileName,
@@ -329,12 +346,14 @@ export default function WildberriesFeedbackFetcher() {
               </Button>
             </div>
           </div>
-          <Button onClick={handleFetch} disabled={isLoading}>
-            {isLoading ? "Fetching..." : "Fetch Feedback"}
-          </Button>
-          {csvData && (
-            <Button onClick={handleSaveFile}>Save Results to CSV</Button>
-          )}
+          <div className="flex space-x-2">
+            <Button onClick={handleFetch} disabled={isLoading}>
+              {isLoading ? "Fetching..." : "Fetch Feedback"}
+            </Button>
+            {csvData && (
+              <Button onClick={handleSaveFile}>Save Results to CSV</Button>
+            )}
+          </div>
           <div>
             <h3 className="text-lg font-medium">Results:</h3>
             <pre className="mt-2 p-4 bg-gray-100 rounded-md overflow-auto max-h-96">
