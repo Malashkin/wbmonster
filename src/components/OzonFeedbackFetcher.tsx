@@ -1,30 +1,30 @@
 "use client";
 
+import { useAppState } from "@/app/context/StateContext";
+import InstructionModal from "@/components/InstructionModal";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAppState } from "@/app/context/StateContext";
 
 interface ProductItem {
   product_id: string;
-  // Добавьте другие необходимые поля, если нужно
 }
 
 interface ProductListResult {
   items: ProductItem[];
-  // Добавьте другие необходимые поля, если нужно
 }
 
 interface ProductListResponse {
   result: ProductListResult;
-  // Добавьте другие необходимые поля, если нужно
 }
 
 export default function OzonFeedbackFetcher() {
   const { clientId, setClientId, apiKey, setApiKey } = useAppState();
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<string[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchProductIds = async () => {
     setIsLoading(true);
@@ -93,17 +93,29 @@ export default function OzonFeedbackFetcher() {
               type="text"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
-              placeholder="Введите ваш Client ID"
+              placeholder="Введите ваш Client ID Ozon Seller"
               className="mt-2 mb-2"
             />
           </div>
           <div>
-            <label
-              htmlFor="apiKey"
-              className="block text-sm font-medium text-gray-700"
-            >
-              API Key
-            </label>
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="apiKey"
+                className="block text-sm font-medium text-gray-700"
+              >
+                API Key
+              </label>
+              <Tooltip content="Нажмите на значок, чтобы открыть инструкцию">
+                <button
+                  className="text-black text-sm border-2 border-black rounded-full w-5 h-5 flex items-center justify-center font-bold hover:bg-gray-200 transition duration-200 shadow-sm"
+                  onClick={() => setIsModalOpen(true)}
+                  aria-label="Инструкция"
+                  style={{ color: "#374151", borderColor: "#e5e7eb" }}
+                >
+                  i
+                </button>
+              </Tooltip>
+            </div>
             <Input
               id="apiKey"
               type="text"
@@ -115,7 +127,7 @@ export default function OzonFeedbackFetcher() {
           </div>
           <div className="flex space-x-2">
             <Button onClick={fetchProductIds} disabled={isButtonDisabled}>
-              {isLoading ? "Загрузка..." : "Получить список товаров"}
+              {isLoading ? "Загрузка..." : "Fetch results"}
             </Button>
           </div>
           <div>
@@ -126,6 +138,55 @@ export default function OzonFeedbackFetcher() {
           </div>
         </div>
       </CardContent>
+      <InstructionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        content={
+          <div>
+            <ol className="list-decimal pl-4 space-y-2 text-sm">
+              <li>
+                Зайдите в ваш{" "}
+                <a
+                  href="https://seller.ozon.ru/app/"
+                  target="_blank"
+                  className="text-blue-500 underline"
+                >
+                  Личный Кабинет Ozon
+                </a>
+                .
+              </li>
+              <li>
+                Поднесите курсор к названию вашей компании в верхнем правом
+                углу, правее расположена иконка <strong>«Пользователь»</strong>,
+                наведите курсор на нее и в выполывающем окне нажмите{" "}
+                <strong>«Настройки»</strong>
+              </li>
+              <li>
+                Затем выберите раздел <strong>«Seller API»</strong>.
+              </li>
+              <li>
+                Нажмите <strong>«Сгенерировать ключ»</strong>.
+              </li>
+              <li>
+                Задайте имя токена <strong>anyFeedback</strong>. Предоставьте
+                ему доступ <strong>«Admin read only»</strong>.
+              </li>
+              <li>
+                Нажмите кнопку <strong>«Сгенерировать»</strong>.
+              </li>
+              <li>
+                {""}
+                Ключ создан, теперь скопируйте его через кнопку{" "}
+                <strong>«Скопировать»</strong>.
+              </li>
+              <li>
+                Вставьте его в <strong> поле для ввода API ключа </strong> на
+                странице.
+              </li>
+            </ol>
+          </div>
+        }
+      />
     </Card>
   );
 }
