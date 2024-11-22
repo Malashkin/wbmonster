@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppState } from "@/app/context/StateContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip } from "@/components/ui/tooltip";
 import InstructionModal  from "@/components/InstructionModal";
 import { saveAs } from "file-saver";
+ 
 
-// Расширение интерфейса Window для поддержки showSaveFilePicker
 declare global {
   interface Window {
     showSaveFilePicker?: (
@@ -46,9 +47,8 @@ interface Review {
 }
 
 export default function WildberriesFeedbackFetcher() {
-  const [apiKey, setApiKey] = useState("");
-  const [daysCount, setDaysCount] = useState(35);
-  const [nmidList, setNmidList] = useState("");
+  const { apiKey, setApiKey, daysCount, setDaysCount, nmidList, setNmidList } =
+    useAppState();
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<string[]>([]);
   const [csvData, setCsvData] = useState<string>("");
@@ -340,3 +340,4 @@ export default function WildberriesFeedbackFetcher() {
     </Card>
   );
 }
+
