@@ -237,7 +237,7 @@ export default function WildberriesFeedbackFetcher() {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto mt-24">
+    <Card className="w-full max-w-2xl mx-auto mt-8">
       <CardHeader>
         <CardTitle>Wildberries Feedback Fetcher</CardTitle>
       </CardHeader>

@@ -2,14 +2,14 @@
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-export default function OzonFeedbackFetcher() {
+export default function YMFeedbackFetcher() {
   return (
     <Card className="w-full max-w-2xl mx-auto mt-8">
       <CardHeader>
-        <CardTitle>Ozon Feedback Fetcher</CardTitle>
+        <CardTitle>YM Feedback Fetcher</CardTitle>
       </CardHeader>
       <CardContent>
-        <p>Ozon Feedback Fetcher will be here</p>
+        <p>YM Feedback Fetcher will be here</p>
       </CardContent>
     </Card>
   );
