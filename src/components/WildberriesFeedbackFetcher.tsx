@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppState } from "@/app/context/StateContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip } from "@/components/ui/tooltip";
-import InstructionModal  from "@/components/InstructionModal";
+import InstructionModal from "@/components/InstructionModal";
 import { saveAs } from "file-saver";
- 
 
 declare global {
   interface Window {
@@ -54,6 +53,19 @@ export default function WildberriesFeedbackFetcher() {
   const [csvData, setCsvData] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Загружаем данные из localStorage при монтировании компонента
+  useEffect(() => {
+    const savedCsvData = localStorage.getItem("csvData");
+    if (savedCsvData) {
+      setCsvData(savedCsvData);
+    }
+
+    const savedResults = localStorage.getItem("results");
+    if (savedResults) {
+      setResults(JSON.parse(savedResults));
+    }
+  }, []);
+
   const fetchReviews = async (params: FeedbackParams): Promise<Review[]> => {
     const url = "https://feedbacks-api.wildberries.ru/api/v1/feedbacks";
     const response = await fetch(
@@ -70,44 +82,16 @@ export default function WildberriesFeedbackFetcher() {
     return data.data?.feedbacks || [];
   };
 
-  const processReviews = (reviews: Review[]) => {
-    let totalNonEmptyTexts = 0;
-    const uniqueNmIds = new Set<string>();
-    const nmIdTextCounts: { [key: string]: number } = {};
-
-    const processedData = reviews.map((review) => {
-      const nmId = String(review.productDetails.nmId);
-      uniqueNmIds.add(nmId);
-      const text = review.text || "";
-      const author = review.userName || "Unknown";
-      const verified = review.wasViewed || false;
-      const date = review.createdDate
-        ? new Date(review.createdDate).toISOString()
-        : "";
-      const rating = review.productValuation || 0;
-
-      if (text) {
-        totalNonEmptyTexts++;
-        nmIdTextCounts[nmId] = (nmIdTextCounts[nmId] || 0) + 1;
-      }
-
-      return {
-        nmId,
-        text,
-        author,
-        verified,
-        date,
-        rating,
-      };
-    });
-
-    return { processedData, totalNonEmptyTexts, uniqueNmIds, nmIdTextCounts };
-  };
+  const delay = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
   const handleFetch = async () => {
     setIsLoading(true);
     setResults([]);
     setCsvData("");
+    localStorage.removeItem("csvData");
+    localStorage.removeItem("results");
+
     const now = new Date();
     const startDate = new Date(now.getTime() - daysCount * 24 * 60 * 60 * 1000);
 
@@ -130,80 +114,91 @@ export default function WildberriesFeedbackFetcher() {
     try {
       const nmids = nmidList ? nmidList.split(",").map((id) => id.trim()) : [];
 
-      if (nmids.length > 0) {
-        for (const nmid of nmids) {
-          const params: FeedbackParams = { ...baseParams, nmId: nmid };
-          setResults((prev) => [...prev, `Обработка nmId: ${nmid}`]);
+      const concurrencyLimit = 5; // Максимум одновременных запросов
+      const delayMs = 5000; // Задержка между запросами в миллисекундах
+      const batches = [];
 
-          let skip = 0;
-          while (true) {
-            const reviews = await fetchReviews({ ...params, skip });
-            if (reviews.length === 0) break;
+      // Разбиваем на батчи по 1000
+      for (let i = 0; i < nmids.length; i += 1000) {
+        batches.push(nmids.slice(i, i + 1000));
+      }
 
-            const {
-              processedData,
-              totalNonEmptyTexts: nonEmptyTexts,
-              uniqueNmIds,
-              nmIdTextCounts: textCounts,
-            } = processReviews(reviews);
-
-            totalReviewsProcessed += processedData.length;
-            uniqueNmIdsSet = new Set([...uniqueNmIdsSet, ...uniqueNmIds]);
-            totalNonEmptyTexts += nonEmptyTexts;
-            Object.keys(textCounts).forEach((key) => {
-              nmIdTextCounts[key] =
-                (nmIdTextCounts[key] || 0) + textCounts[key];
-            });
-
-            processedData.forEach((review) => {
-              const verifiedStr = review.verified ? "TRUE" : "FALSE";
-              const formattedDate = review.date;
-              const escapedText = review.text.replace(/"/g, '""');
-              const escapedAuthor = review.author.replace(/"/g, '""');
-              csvContent += `"${review.nmId}","${escapedText}","${escapedAuthor}",${verifiedStr},"${formattedDate}",${review.rating}\n`;
-            });
-
-            skip += reviews.length;
-            setResults((prev) => [
-              ...prev,
-              `Общее количество обработанных отзывов: ${totalReviewsProcessed}`,
-            ]);
-          }
-        }
-      } else {
-        let skip = 0;
-        while (true) {
-          const reviews = await fetchReviews({ ...baseParams, skip });
-          if (reviews.length === 0) break;
-
-          const {
-            processedData,
-            totalNonEmptyTexts: nonEmptyTexts,
-            uniqueNmIds,
-            nmIdTextCounts: textCounts,
-          } = processReviews(reviews);
-
-          totalReviewsProcessed += processedData.length;
-          uniqueNmIdsSet = new Set([...uniqueNmIdsSet, ...uniqueNmIds]);
-          totalNonEmptyTexts += nonEmptyTexts;
-          Object.keys(textCounts).forEach((key) => {
-            nmIdTextCounts[key] = (nmIdTextCounts[key] || 0) + textCounts[key];
-          });
-
-          processedData.forEach((review) => {
-            const verifiedStr = review.verified ? "TRUE" : "FALSE";
-            const formattedDate = review.date;
-            const escapedText = review.text.replace(/"/g, '""');
-            const escapedAuthor = review.author.replace(/"/g, '""');
-            csvContent += `"${review.nmId}","${escapedText}","${escapedAuthor}",${verifiedStr},"${formattedDate}",${review.rating}\n`;
-          });
-
-          skip += reviews.length;
-          setResults((prev) => [
+      for (const batch of batches) {
+        setResults((prev) => {
+          const updatedResults = [
             ...prev,
-            `Общее количество обработанных отзывов: ${totalReviewsProcessed}`,
-          ]);
+            `Обработка новой пачки из ${batch.length} NMID`,
+          ];
+          localStorage.setItem("results", JSON.stringify(updatedResults));
+          return updatedResults;
+        });
+
+        const { results: batchResults, errors } =
+          await processBatchConcurrently(
+            batch,
+            concurrencyLimit,
+            baseParams,
+            delayMs,
+            (processedId) => {
+              // Обновляем результаты и сохраняем в localStorage
+              setResults((prev) => {
+                const updatedResults = [
+                  ...prev,
+                  `Обработан nmId: ${processedId}`,
+                ];
+                localStorage.setItem("results", JSON.stringify(updatedResults));
+                return updatedResults;
+              });
+            }
+          );
+
+        if (errors.length > 0) {
+          setResults((prev) => {
+            const updatedResults = [...prev, ...errors];
+            localStorage.setItem("results", JSON.stringify(updatedResults));
+            return updatedResults;
+          });
         }
+
+        batchResults.forEach((review) => {
+          const nmId = String(review.productDetails.nmId);
+          const text = review.text || "";
+          const author = review.userName || "Unknown";
+          const verifiedStr = review.wasViewed ? "TRUE" : "FALSE";
+          const formattedDate = review.createdDate
+            ? new Date(review.createdDate).toISOString()
+            : "";
+          const rating = review.productValuation || 0;
+
+          if (text) {
+            totalNonEmptyTexts++;
+            nmIdTextCounts[nmId] = (nmIdTextCounts[nmId] || 0) + 1;
+          }
+
+          csvContent += `"${nmId}","${text.replace(
+            /"/g,
+            '""'
+          )}","${author.replace(
+            /"/g,
+            '""'
+          )}",${verifiedStr},"${formattedDate}",${rating}\n`;
+          uniqueNmIdsSet.add(nmId);
+        });
+
+        totalReviewsProcessed += batchResults.length;
+
+        // Сохраняем текущий csvContent в localStorage
+        setCsvData(csvContent);
+        localStorage.setItem("csvData", csvContent);
+
+        setResults((prev) => {
+          const updatedResults = [
+            ...prev,
+            `Обработано ${totalReviewsProcessed} отзывов в текущей пачке.`,
+          ];
+          localStorage.setItem("results", JSON.stringify(updatedResults));
+          return updatedResults;
+        });
       }
 
       const nmIdMoreThan5Texts = Object.values(nmIdTextCounts).filter(
@@ -216,13 +211,73 @@ export default function WildberriesFeedbackFetcher() {
         `Количество NmId с более чем 5 текстовыми отзывами: ${nmIdMoreThan5Texts}`,
       ];
 
-      setResults((prev) => [...prev, ...finalResults]);
-      setCsvData(csvContent);
+      setResults((prev) => {
+        const updatedResults = [...prev, ...finalResults];
+        localStorage.setItem("results", JSON.stringify(updatedResults));
+        return updatedResults;
+      });
     } catch (error) {
-      setResults((prev) => [...prev, `Произошла ошибка: ${error}`]);
+      setResults((prev) => {
+        const updatedResults = [...prev, `Произошла ошибка: ${error}`];
+        localStorage.setItem("results", JSON.stringify(updatedResults));
+        return updatedResults;
+      });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const processBatchConcurrently = async (
+    batch: string[],
+    concurrency: number,
+    baseParams: FeedbackParams,
+    delayMs: number,
+    onProcessedId: (id: string) => void
+  ) => {
+    const results: Review[] = [];
+    const errors: string[] = [];
+
+    let index = 0;
+    const total = batch.length;
+
+    const startNext = async () => {
+      if (index >= total) return;
+      const nmid = batch[index];
+      index++;
+      await delay(delayMs);
+
+      const params: FeedbackParams = { ...baseParams, nmId: nmid };
+      let skip = 0;
+      let allReviews: Review[] = [];
+
+      try {
+        while (true) {
+          const reviews = await fetchReviews({ ...params, skip });
+          if (reviews.length === 0) break;
+          allReviews = [...allReviews, ...reviews];
+          skip += reviews.length;
+        }
+        results.push(...allReviews);
+
+        // Вызываем коллбэк для обновления результатов
+        onProcessedId(nmid);
+      } catch (error) {
+        errors.push(`Ошибка при обработке nmId: ${nmid}, ${error}`);
+      }
+
+      // Запускаем следующий запрос
+      await startNext();
+    };
+
+    // Запускаем первоначальные задачи
+    const tasks = [];
+    for (let i = 0; i < concurrency && i < total; i++) {
+      tasks.push(startNext());
+    }
+
+    await Promise.all(tasks);
+
+    return { results, errors };
   };
 
   const handleSaveFile = async () => {
@@ -234,6 +289,10 @@ export default function WildberriesFeedbackFetcher() {
       .slice(0, 10)}.csv`;
 
     saveAs(blob, fileName);
+
+    // Очищаем сохраненные данные после сохранения файла
+    localStorage.removeItem("csvData");
+    localStorage.removeItem("results");
   };
 
   return (
@@ -383,4 +442,3 @@ export default function WildberriesFeedbackFetcher() {
     </Card>
   );
 }
-
